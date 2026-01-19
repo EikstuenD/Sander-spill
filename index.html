@@ -7,24 +7,58 @@
  body {
    margin: 0;
    background: #222;
-   display: flex;
-   justify-content: center;
-   align-items: center;
-   height: 100vh;
    color: white;
-   font-family: Arial;
+   font-family: Arial, sans-serif;
+   text-align: center;
+   overflow: hidden;
+ }
+ #menu {
+   position: absolute;
+   inset: 0;
+   display: flex;
+   flex-direction: column;
+   justify-content: center;
+   gap: 15px;
+ }
+ button {
+   padding: 12px;
+   font-size: 18px;
+   cursor: pointer;
  }
  canvas {
+   display: none;
+   margin: auto;
    background: #111;
    border: 2px solid white;
  }
 </style>
 </head>
 <body>
+<div id="menu">
+<h1>Kube Hopper</h1>
+<label>
+   Vanskelighetsgrad:
+<select id="difficulty">
+<option value="easy">Lett</option>
+<option value="medium">Medium</option>
+<option value="hard">Vanskelig</option>
+</select>
+</label>
+<label>
+   Bane:
+<select id="level">
+<option value="1">Bane 1</option>
+<option value="2">Bane 2</option>
+<option value="3">Bane 3</option>
+</select>
+</label>
+<button onclick="startGame()">Start spill</button>
+</div>
 <canvas id="game" width="800" height="300"></canvas>
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const menu = document.getElementById("menu");
 // Spiller
 const player = {
  x: 150,
@@ -35,21 +69,46 @@ const player = {
  jump: -13,
  onGround: true
 };
-// Spill-variabler
 let spikes = [];
 let speed = 5;
 let score = 0;
-let highscore = localStorage.getItem("highscore") || 0;
-// Lag spiss blokk
-function newSpike() {
- spikes.push({
-   x: canvas.width,
-   width: 30,
-   height: 30
- });
+let highscore = 0;
+let gameRunning = false;
+let spikeInterval;
+// Vanskelighetsgrader
+const difficulties = {
+ easy: { speed: 4, spawn: 1600 },
+ medium: { speed: 6, spawn: 1200 },
+ hard: { speed: 8, spawn: 900 }
+};
+// Baner (forskjellige spike-høyder)
+const levels = {
+ 1: () => 30,
+ 2: () => Math.random() > 0.5 ? 30 : 50,
+ 3: () => Math.random() > 0.7 ? 60 : 30
+};
+function startGame() {
+ menu.style.display = "none";
+ canvas.style.display = "block";
+ const diff = document.getElementById("difficulty").value;
+ const level = document.getElementById("level").value;
+ speed = difficulties[diff].speed;
+ score = 0;
+ spikes = [];
+ player.y = 220;
+ player.yVel = 0;
+ highscore = localStorage.getItem("highscore_" + diff) || 0;
+ clearInterval(spikeInterval);
+ spikeInterval = setInterval(() => {
+   spikes.push({
+     x: canvas.width,
+     width: 30,
+     height: levels[level]()
+   });
+ }, difficulties[diff].spawn);
+ gameRunning = true;
+ loop(diff);
 }
-setInterval(newSpike, 1400);
-// Oppdater spiller
 function updatePlayer() {
  player.yVel += player.gravity;
  player.y += player.yVel;
@@ -59,80 +118,66 @@ function updatePlayer() {
    player.onGround = true;
  }
 }
-// Oppdater hindringer
 function updateSpikes() {
- spikes.forEach(spike => spike.x -= speed);
- spikes = spikes.filter(spike => spike.x > -40);
+ spikes.forEach(s => s.x -= speed);
+ spikes = spikes.filter(s => s.x > -40);
 }
-// Kollisjon
-function collision() {
- spikes.forEach(spike => {
+function collision(diff) {
+ spikes.forEach(s => {
    if (
-     player.x < spike.x + spike.width &&
-     player.x + player.size > spike.x &&
-     player.y + player.size > 250 - spike.height
+     player.x < s.x + s.width &&
+     player.x + player.size > s.x &&
+     player.y + player.size > 250 - s.height
    ) {
      if (score > highscore) {
-       localStorage.setItem("highscore", score);
+       localStorage.setItem("highscore_" + diff, score);
      }
-     alert("Game Over!\nScore: " + score + "\nHighscore: " + Math.max(score, highscore));
+     alert(
+       "Game Over!\nScore: " + score +
+       "\nHighscore: " + Math.max(score, highscore)
+     );
      location.reload();
    }
  });
 }
-// Tegning
-function drawPlayer() {
+function draw() {
+ ctx.clearRect(0, 0, canvas.width, canvas.height);
+ ctx.fillStyle = "#555";
+ ctx.fillRect(0, 250, canvas.width, 50);
  ctx.fillStyle = "#00ffcc";
  ctx.fillRect(player.x, player.y, player.size, player.size);
-}
-function drawSpikes() {
  ctx.fillStyle = "red";
- spikes.forEach(spike => {
+ spikes.forEach(s => {
    ctx.beginPath();
-   ctx.moveTo(spike.x, 250);
-   ctx.lineTo(spike.x + spike.width / 2, 250 - spike.height);
-   ctx.lineTo(spike.x + spike.width, 250);
-   ctx.closePath();
+   ctx.moveTo(s.x, 250);
+   ctx.lineTo(s.x + s.width / 2, 250 - s.height);
+   ctx.lineTo(s.x + s.width, 250);
    ctx.fill();
  });
-}
-// Poeng og fart
-function updateScore() {
- score++;
- if (score % 300 === 0) {
-   speed += 0.5; // Øker farten over tid
- }
-}
-// UI
-function drawUI() {
  ctx.fillStyle = "white";
- ctx.font = "16px Arial";
  ctx.fillText("Score: " + score, 10, 20);
  ctx.fillText("Highscore: " + highscore, 10, 40);
 }
-// Spill-løkke
-function loop() {
- ctx.clearRect(0, 0, canvas.width, canvas.height);
- // Bakke
- ctx.fillStyle = "#555";
- ctx.fillRect(0, 250, canvas.width, 50);
+function loop(diff) {
+ if (!gameRunning) return;
  updatePlayer();
  updateSpikes();
- updateScore();
- collision();
- drawPlayer();
- drawSpikes();
- drawUI();
- requestAnimationFrame(loop);
+ collision(diff);
+ draw();
+ score++;
+ if (score % 400 === 0) speed += 0.5;
+ requestAnimationFrame(() => loop(diff));
 }
-// Kontroll
+// Hopp (mellomrom)
 document.addEventListener("keydown", e => {
- if (e.code === "Space" && player.onGround) {
-   player.yVel = player.jump;
-   player.onGround = false;
+ if (e.code === "Space") {
+   e.preventDefault();
+   if (player.onGround && gameRunning) {
+     player.yVel = player.jump;
+     player.onGround = false;
+   }
  }
 });
-loop();
 </script>
 </body>
 </html>
