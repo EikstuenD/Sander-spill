@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>Kube som hopper</title>
+<style>
+ body {
+   margin: 0;
+   background: #222;
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   height: 100vh;
+ }
+ canvas {
+   background: #111;
+   border: 2px solid #fff;
+ }
+</style>
+</head>
+<body>
+<canvas id="game" width="800" height="300"></canvas>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+// Kube
+const player = {
+ x: 50,
+ y: 220,
+ size: 30,
+ yVelocity: 0,
+ gravity: 0.8,
+ jumpPower: -12,
+ onGround: true
+};
+// Spiss blokk
+let spikes = [{
+ x: 800,
+ width: 30,
+ height: 30
+}];
+function drawPlayer() {
+ ctx.fillStyle = "#00ffcc";
+ ctx.fillRect(player.x, player.y, player.size, player.size);
+}
+function drawSpikes() {
+ ctx.fillStyle = "red";
+ spikes.forEach(spike => {
+   ctx.beginPath();
+   ctx.moveTo(spike.x, 250);
+   ctx.lineTo(spike.x + spike.width / 2, 250 - spike.height);
+   ctx.lineTo(spike.x + spike.width, 250);
+   ctx.closePath();
+   ctx.fill();
+ });
+}
+function updatePlayer() {
+ player.yVelocity += player.gravity;
+ player.y += player.yVelocity;
+ if (player.y >= 220) {
+   player.y = 220;
+   player.yVelocity = 0;
+   player.onGround = true;
+ }
+}
+function updateSpikes() {
+ spikes.forEach(spike => spike.x -= 5);
+ if (spikes[0].x < -30) {
+   spikes.shift();
+   spikes.push({
+     x: 800 + Math.random() * 200,
+     width: 30,
+     height: 30
+   });
+ }
+}
+function checkCollision() {
+ spikes.forEach(spike => {
+   if (
+     player.x < spike.x + spike.width &&
+     player.x + player.size > spike.x &&
+     player.y + player.size > 220 - spike.height
+   ) {
+     alert("Game Over!");
+     location.reload();
+   }
+ });
+}
+function gameLoop() {
+ ctx.clearRect(0, 0, canvas.width, canvas.height);
+ // Bakke
+ ctx.fillStyle = "#555";
+ ctx.fillRect(0, 250, canvas.width, 50);
+ updatePlayer();
+ updateSpikes();
+ checkCollision();
+ drawPlayer();
+ drawSpikes();
+ requestAnimationFrame(gameLoop);
+}
+document.addEventListener("keydown", e => {
+ if (e.code === "Space" && player.onGround) {
+   player.yVelocity = player.jumpPower;
+   player.onGround = false;
+ }
+});
+gameLoop();
+</script>
+</body>
+</html>
