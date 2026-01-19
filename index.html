@@ -2,182 +2,148 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<title>Kube Hopper</title>
+<title>Cube Dash</title>
 <style>
- body {
-   margin: 0;
-   background: #222;
-   color: white;
-   font-family: Arial, sans-serif;
-   text-align: center;
-   overflow: hidden;
- }
- #menu {
-   position: absolute;
-   inset: 0;
-   display: flex;
-   flex-direction: column;
-   justify-content: center;
-   gap: 15px;
- }
- button {
-   padding: 12px;
-   font-size: 18px;
-   cursor: pointer;
- }
- canvas {
-   display: none;
-   margin: auto;
-   background: #111;
-   border: 2px solid white;
- }
+body {
+ margin: 0;
+ background: #000;
+ overflow: hidden;
+}
+canvas {
+ display: block;
+ margin: auto;
+}
 </style>
 </head>
 <body>
-<div id="menu">
-<h1>Kube Hopper</h1>
-<label>
-   Vanskelighetsgrad:
-<select id="difficulty">
-<option value="easy">Lett</option>
-<option value="medium">Medium</option>
-<option value="hard">Vanskelig</option>
-</select>
-</label>
-<label>
-   Bane:
-<select id="level">
-<option value="1">Bane 1</option>
-<option value="2">Bane 2</option>
-<option value="3">Bane 3</option>
-</select>
-</label>
-<button onclick="startGame()">Start spill</button>
-</div>
-<canvas id="game" width="800" height="300"></canvas>
+<canvas id="game" width="900" height="350"></canvas>
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const menu = document.getElementById("menu");
-// Spiller
+const groundY = 270;
+const speed = 6;
 const player = {
- x: 150,
- y: 220,
+ x: 180,
+ y: groundY - 30,
  size: 30,
  yVel: 0,
- gravity: 0.8,
- jump: -13,
+ gravity: 0.9,
+ jump: -14,
+ rotation: 0,
  onGround: true
 };
 let spikes = [];
-let speed = 5;
+let tick = 0;
+let running = true;
 let score = 0;
-let highscore = 0;
-let gameRunning = false;
-let spikeInterval;
-// Vanskelighetsgrader
-const difficulties = {
- easy: { speed: 4, spawn: 1600 },
- medium: { speed: 6, spawn: 1200 },
- hard: { speed: 8, spawn: 900 }
-};
-// Baner (forskjellige spike-høyder)
-const levels = {
- 1: () => 30,
- 2: () => Math.random() > 0.5 ? 30 : 50,
- 3: () => Math.random() > 0.7 ? 60 : 30
-};
-function startGame() {
- menu.style.display = "none";
- canvas.style.display = "block";
- const diff = document.getElementById("difficulty").value;
- const level = document.getElementById("level").value;
- speed = difficulties[diff].speed;
- score = 0;
- spikes = [];
- player.y = 220;
- player.yVel = 0;
- highscore = localStorage.getItem("highscore_" + diff) || 0;
- clearInterval(spikeInterval);
- spikeInterval = setInterval(() => {
+// Forhåndsdefinerte GD-aktige patterns
+const patterns = [
+ [30],
+ [30,30],
+ [30,30,30],
+ [50,30],
+ [30,50,30],
+ [30,30,50],
+ [50,50],
+ [30,30,30,30]
+];
+function spawnPattern() {
+ const pattern = patterns[tick % patterns.length];
+ let offset = 0;
+ pattern.forEach(h => {
    spikes.push({
-     x: canvas.width,
-     width: 30,
-     height: levels[level]()
+     x: canvas.width + offset,
+     w: 30,
+     h: h
    });
- }, difficulties[diff].spawn);
- gameRunning = true;
- loop(diff);
+   offset += 32;
+ });
 }
-function updatePlayer() {
+// Input
+document.addEventListener("keydown", e => {
+ if (e.code === "Space" && player.onGround) {
+   player.yVel = player.jump;
+   player.onGround = false;
+ }
+});
+// Update
+function update() {
+ // Player physics
  player.yVel += player.gravity;
  player.y += player.yVel;
- if (player.y >= 220) {
-   player.y = 220;
+ if (player.y >= groundY - player.size) {
+   player.y = groundY - player.size;
    player.yVel = 0;
    player.onGround = true;
+   player.rotation = 0;
+ } else {
+   player.rotation += 0.2;
  }
-}
-function updateSpikes() {
+ // Spikes
  spikes.forEach(s => s.x -= speed);
- spikes = spikes.filter(s => s.x > -40);
-}
-function collision(diff) {
+ spikes = spikes.filter(s => s.x > -50);
+ if (tick % 90 === 0) spawnPattern();
+ // Collision
  spikes.forEach(s => {
    if (
-     player.x < s.x + s.width &&
+     player.x < s.x + s.w &&
      player.x + player.size > s.x &&
-     player.y + player.size > 250 - s.height
+     player.y + player.size > groundY - s.h
    ) {
-     if (score > highscore) {
-       localStorage.setItem("highscore_" + diff, score);
-     }
-     alert(
-       "Game Over!\nScore: " + score +
-       "\nHighscore: " + Math.max(score, highscore)
-     );
+     running = false;
+     alert("Game Over\nScore: " + score);
      location.reload();
    }
  });
+ score++;
+ tick++;
+}
+// Draw
+function drawBackground() {
+ ctx.fillStyle = "#0b0b1e";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.strokeStyle = "#1ff";
+ ctx.globalAlpha = 0.15;
+ for (let i = 0; i < canvas.width; i += 40) {
+   ctx.beginPath();
+   ctx.moveTo(i, 0);
+   ctx.lineTo(i, canvas.height);
+   ctx.stroke();
+ }
+ ctx.globalAlpha = 1;
 }
 function draw() {
- ctx.clearRect(0, 0, canvas.width, canvas.height);
- ctx.fillStyle = "#555";
- ctx.fillRect(0, 250, canvas.width, 50);
- ctx.fillStyle = "#00ffcc";
- ctx.fillRect(player.x, player.y, player.size, player.size);
- ctx.fillStyle = "red";
+ drawBackground();
+ // Ground
+ ctx.fillStyle = "#111";
+ ctx.fillRect(0, groundY, canvas.width, 80);
+ // Player
+ ctx.save();
+ ctx.translate(player.x + 15, player.y + 15);
+ ctx.rotate(player.rotation);
+ ctx.fillStyle = "#00ffff";
+ ctx.fillRect(-15, -15, 30, 30);
+ ctx.restore();
+ // Spikes
+ ctx.fillStyle = "#ff0055";
  spikes.forEach(s => {
    ctx.beginPath();
-   ctx.moveTo(s.x, 250);
-   ctx.lineTo(s.x + s.width / 2, 250 - s.height);
-   ctx.lineTo(s.x + s.width, 250);
+   ctx.moveTo(s.x, groundY);
+   ctx.lineTo(s.x + s.w / 2, groundY - s.h);
+   ctx.lineTo(s.x + s.w, groundY);
    ctx.fill();
  });
- ctx.fillStyle = "white";
- ctx.fillText("Score: " + score, 10, 20);
- ctx.fillText("Highscore: " + highscore, 10, 40);
+ ctx.fillStyle = "#fff";
+ ctx.fillText("Score: " + score, 15, 25);
 }
-function loop(diff) {
- if (!gameRunning) return;
- updatePlayer();
- updateSpikes();
- collision(diff);
+// Loop
+function loop() {
+ if (!running) return;
+ update();
  draw();
- score++;
- if (score % 400 === 0) speed += 0.5;
- requestAnimationFrame(() => loop(diff));
+ requestAnimationFrame(loop);
 }
-// Hopp (mellomrom)
-document.addEventListener("keydown", e => {
- if (e.code === "Space") {
-   e.preventDefault();
-   if (player.onGround && gameRunning) {
-     player.yVel = player.jump;
-     player.onGround = false;
-   }
- }
-});
+loop();
 </script>
 </body>
 </html>
