@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<title>Kube som hopper</title>
+<title>Kube Hopper</title>
 <style>
  body {
    margin: 0;
@@ -11,6 +11,8 @@
    justify-content: center;
    align-items: center;
    height: 100vh;
+   color: white;
+   font-family: Arial;
  }
  canvas {
    background: #111;
@@ -23,7 +25,7 @@
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-// Spiller (kube)
+// Spiller
 const player = {
  x: 150,
  y: 220,
@@ -33,10 +35,12 @@ const player = {
  jump: -13,
  onGround: true
 };
-// Spisse blokker
+// Spill-variabler
 let spikes = [];
 let speed = 5;
-// Lag ny spike
+let score = 0;
+let highscore = localStorage.getItem("highscore") || 0;
+// Lag spiss blokk
 function newSpike() {
  spikes.push({
    x: canvas.width,
@@ -44,7 +48,8 @@ function newSpike() {
    height: 30
  });
 }
-setInterval(newSpike, 1500);
+setInterval(newSpike, 1400);
+// Oppdater spiller
 function updatePlayer() {
  player.yVel += player.gravity;
  player.y += player.yVel;
@@ -54,10 +59,28 @@ function updatePlayer() {
    player.onGround = true;
  }
 }
+// Oppdater hindringer
 function updateSpikes() {
  spikes.forEach(spike => spike.x -= speed);
  spikes = spikes.filter(spike => spike.x > -40);
 }
+// Kollisjon
+function collision() {
+ spikes.forEach(spike => {
+   if (
+     player.x < spike.x + spike.width &&
+     player.x + player.size > spike.x &&
+     player.y + player.size > 250 - spike.height
+   ) {
+     if (score > highscore) {
+       localStorage.setItem("highscore", score);
+     }
+     alert("Game Over!\nScore: " + score + "\nHighscore: " + Math.max(score, highscore));
+     location.reload();
+   }
+ });
+}
+// Tegning
 function drawPlayer() {
  ctx.fillStyle = "#00ffcc";
  ctx.fillRect(player.x, player.y, player.size, player.size);
@@ -73,18 +96,21 @@ function drawSpikes() {
    ctx.fill();
  });
 }
-function collision() {
- spikes.forEach(spike => {
-   if (
-     player.x < spike.x + spike.width &&
-     player.x + player.size > spike.x &&
-     player.y + player.size > 250 - spike.height
-   ) {
-     alert("Game Over!");
-     location.reload();
-   }
- });
+// Poeng og fart
+function updateScore() {
+ score++;
+ if (score % 300 === 0) {
+   speed += 0.5; // Øker farten over tid
+ }
 }
+// UI
+function drawUI() {
+ ctx.fillStyle = "white";
+ ctx.font = "16px Arial";
+ ctx.fillText("Score: " + score, 10, 20);
+ ctx.fillText("Highscore: " + highscore, 10, 40);
+}
+// Spill-løkke
 function loop() {
  ctx.clearRect(0, 0, canvas.width, canvas.height);
  // Bakke
@@ -92,11 +118,14 @@ function loop() {
  ctx.fillRect(0, 250, canvas.width, 50);
  updatePlayer();
  updateSpikes();
+ updateScore();
  collision();
  drawPlayer();
  drawSpikes();
+ drawUI();
  requestAnimationFrame(loop);
 }
+// Kontroll
 document.addEventListener("keydown", e => {
  if (e.code === "Space" && player.onGround) {
    player.yVel = player.jump;
